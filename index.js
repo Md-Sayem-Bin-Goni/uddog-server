@@ -2,7 +2,7 @@ import express from "express"
 import { MongoClient, ObjectId } from 'mongodb';
 import 'dotenv/config';
 import cors from "cors";
-// import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 
 const app = express()
@@ -31,6 +31,72 @@ const eventCollection = db.collection('events')
 const registrationCollection = db.collection("joined");
 
 
+const JWKS = createRemoteJWKSet(
+    new URL("http://localhost:3000/api/auth/jwks")
+);
+
+
+const verifyToken = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    // Check Authorization header
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).send({
+            message: "Unauthorized! Token missing."
+        });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        // Verify JWT
+        const { payload } = await jwtVerify(token, JWKS, {
+            issuer: "http://localhost:3000",
+            audience: "http://localhost:3000",
+        });
+
+        // Store user information
+        req.user = payload;
+
+        next();
+
+    } catch (error) {
+        console.error("JWT verification failed:", error.message);
+
+        return res.status(401).send({
+            message: "Invalid or expired token."
+        });
+    }
+};
+
+// const verifyToken = async (req, res, next) => {
+//     const authHeader = req.headers.authorization;
+
+//     if (!authHeader) {
+//         return res.status(401).send({ msg: "Unauth" })
+//     }
+
+//     const token = authHeader.split(" ")[1]
+
+//     if (!token) {
+//         return res.status(401).send({ msg: "Unauthorized!" });
+//     }
+
+
+//     const JWKS = createRemoteJWKSet(
+//         new URL('http://localhost:3000/api/auth/jwks')
+//     )
+
+//     try {
+//         const { payload } = await jwtVerify(token, JWKS)
+//         next()
+//     } catch (error) {
+//         return res.status(500).send({ msg: "Server Error!" });
+
+//     }
+// }
+
+
 
 
 app.get('/', (req, res) => {
@@ -40,7 +106,9 @@ app.get('/', (req, res) => {
 
 
 
-app.post("/add-events", async (req, res) => {
+
+
+app.post("/add-events", verifyToken, async (req, res) => {
     const eventData = req.body
 
     const result = await eventCollection.insertOne({
@@ -55,7 +123,7 @@ app.post("/add-events", async (req, res) => {
     })
 })
 
-app.get("/my-created-events/:email", async (req, res) => {
+app.get("/my-created-events/:email", verifyToken, async (req, res) => {
     const email = req.params.email
 
     const result = await eventCollection
@@ -65,7 +133,7 @@ app.get("/my-created-events/:email", async (req, res) => {
     res.send(result)
 })
 
-app.get("/events", async (req, res) => {
+app.get("/all-events", async (req, res) => {
     const result = await eventCollection.find().toArray();
 
     res.send({
@@ -75,7 +143,7 @@ app.get("/events", async (req, res) => {
 });
 
 
-app.get("/events/:id", async (req, res) => {
+app.get("/events/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
 
     if (!ObjectId.isValid(id)) {
@@ -103,7 +171,7 @@ app.get("/events/:id", async (req, res) => {
 
 
 
-app.post("/join-event", async (req, res) => {
+app.post("/join-event", verifyToken, async (req, res) => {
     const { eventId, email } = req.body;
 
     // Check if the user already joined this event
@@ -130,7 +198,7 @@ app.post("/join-event", async (req, res) => {
 
 
 
-app.get("/my-joined-events/:email", async (req, res) => {
+app.get("/my-joined-events/:email", verifyToken, async (req, res) => {
     const email = req.params.email
 
     const today = new Date().toISOString().split("T")[0]
@@ -146,7 +214,7 @@ app.get("/my-joined-events/:email", async (req, res) => {
     res.send(result)
 })
 
-app.delete("/delete-event/:id", async (req, res) => {
+app.delete("/delete-event/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
 
     const result = await eventCollection.deleteOne({
@@ -167,7 +235,7 @@ app.delete("/delete-event/:id", async (req, res) => {
 
 
 
-app.put("/update-event/:id", async (req, res) => {
+app.put("/update-event/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
     const updatedEvent = req.body;
 
