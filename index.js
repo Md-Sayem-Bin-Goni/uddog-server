@@ -104,25 +104,47 @@ app.get("/events/:id", async (req, res) => {
 
 
 app.post("/join-event", async (req, res) => {
-    console.log("joined trigger");
-    const joinData = req.body
+    const { eventId, email } = req.body;
 
-    const result = await registrationCollection.insertOne(joinData)
+    // Check if the user already joined this event
+    const alreadyJoined = await registrationCollection.findOne({
+        eventId: eventId,
+        email: email
+    });
 
-    res.send(result)
-})
+    if (alreadyJoined) {
+        return res.status(409).send({
+            message: "You have already joined this event!"
+        });
+    }
+
+    // Insert registration only if not already joined
+    const result = await registrationCollection.insertOne(req.body);
+
+    res.send({
+        message: "Successfully joined the event!",
+        insertedId: result.insertedId
+    });
+});
+
+
 
 
 app.get("/my-joined-events/:email", async (req, res) => {
     const email = req.params.email
 
+    const today = new Date().toISOString().split("T")[0]
+
     const result = await registrationCollection
-        .find({ email: email })
+        .find({
+            email: email,
+            eventDate: { $gte: today }
+        })
+        .sort({ eventDate: 1 })
         .toArray()
 
     res.send(result)
 })
-
 
 app.delete("/delete-event/:id", async (req, res) => {
     const { id } = req.params;
@@ -167,6 +189,33 @@ app.put("/update-event/:id", async (req, res) => {
         message: "Event updated successfully"
     });
 });
+
+
+app.get("/upcoming-events", async (req, res) => {
+    try {
+        const today = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Dhaka",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).format(new Date());
+
+        const result = await eventCollection
+            .find({ eventDate: { $gte: today } })
+            .sort({ eventDate: 1 })
+            .limit(6)
+            .toArray();
+
+        res.send(result);
+
+    } catch (error) {
+        res.status(500).send({
+            message: "Failed to fetch upcoming events",
+            error: error.message,
+        });
+    }
+});
+
 
 
 app.listen(port, () => {
