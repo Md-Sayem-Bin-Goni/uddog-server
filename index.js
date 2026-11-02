@@ -31,44 +31,35 @@ const eventCollection = db.collection('events')
 const registrationCollection = db.collection("joined");
 
 
-const JWKS = createRemoteJWKSet(
-    new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
-);
 
 
 const verifyToken = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
-    // Check Authorization header
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).send({
-            message: "Unauthorized! Token missing."
-        });
+    if (!authHeader) {
+        return res.status(401).send({ msg: "Unauthorized!" });
     }
 
     const token = authHeader.split(" ")[1];
 
+    if (!token) {
+        return res.status(401).send({ msg: "Unauthorized!" });
+    }
+
+    const JWKS = createRemoteJWKSet(
+        new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
+    );
+
     try {
-        // Verify JWT
-        const { payload } = await jwtVerify(token, JWKS, {
-            issuer: process.env.CLIENT_URL,
-            audience: process.env.CLIENT_URL,
-        });
-
-        // Store user information
+        const { payload } = await jwtVerify(token, JWKS);
         req.user = payload;
-
         next();
 
     } catch (error) {
-        console.error("JWT verification failed:", error.message);
-
-        return res.status(401).send({
-            message: "Invalid or expired token."
-        });
+        console.log(error.message);
+        return res.status(401).send({ msg: "Invalid Token!" });
     }
 };
-
 
 
 
@@ -76,8 +67,6 @@ const verifyToken = async (req, res, next) => {
 app.get('/', (req, res) => {
     res.send('HELLO WORLD');
 });
-
-
 
 
 
@@ -97,6 +86,23 @@ app.post("/add-events", verifyToken, async (req, res) => {
     })
 })
 
+
+app.get("/all-events", async (req, res) => {
+    const result = await eventCollection.find().toArray();
+
+    res.send({
+        success: true,
+        events: result,
+    });
+});
+
+
+
+
+
+
+
+
 app.get("/my-created-events/:email", verifyToken, async (req, res) => {
     const email = req.params.email
 
@@ -107,14 +113,8 @@ app.get("/my-created-events/:email", verifyToken, async (req, res) => {
     res.send(result)
 })
 
-app.get("/all-events", async (req, res) => {
-    const result = await eventCollection.find().toArray();
 
-    res.send({
-        success: true,
-        events: result,
-    });
-});
+
 
 
 app.get("/events/:id", verifyToken, async (req, res) => {
@@ -141,6 +141,9 @@ app.get("/events/:id", verifyToken, async (req, res) => {
         event,
     });
 });
+
+
+
 
 
 
@@ -172,7 +175,9 @@ app.post("/join-event", verifyToken, async (req, res) => {
 
 
 
-app.get("/my-joined-events/:email", verifyToken, async (req, res) => {
+
+
+app.get("/my-joined-events/:email",verifyToken, async (req, res) => {
     const email = req.params.email
 
     const today = new Date().toISOString().split("T")[0]
@@ -187,6 +192,12 @@ app.get("/my-joined-events/:email", verifyToken, async (req, res) => {
 
     res.send(result)
 })
+
+
+
+
+
+
 
 app.delete("/delete-event/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
@@ -206,6 +217,11 @@ app.delete("/delete-event/:id", verifyToken, async (req, res) => {
         message: "Event deleted successfully"
     });
 });
+
+
+
+
+
 
 
 
@@ -233,6 +249,11 @@ app.put("/update-event/:id", verifyToken, async (req, res) => {
 });
 
 
+
+
+
+
+
 app.get("/upcoming-events", async (req, res) => {
     try {
         const today = new Intl.DateTimeFormat("en-CA", {
@@ -257,6 +278,9 @@ app.get("/upcoming-events", async (req, res) => {
         });
     }
 });
+
+
+
 
 
 
