@@ -32,7 +32,7 @@ const registrationCollection = db.collection("joined");
 
 
 const JWKS = createRemoteJWKSet(
-    new URL("http://localhost:3000/api/auth/jwks")
+    new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
 );
 
 
@@ -51,8 +51,8 @@ const verifyToken = async (req, res, next) => {
     try {
         // Verify JWT
         const { payload } = await jwtVerify(token, JWKS, {
-            issuer: "http://localhost:3000",
-            audience: "http://localhost:3000",
+            issuer: process.env.CLIENT_URL,
+            audience: process.env.CLIENT_URL,
         });
 
         // Store user information
@@ -69,32 +69,6 @@ const verifyToken = async (req, res, next) => {
     }
 };
 
-// const verifyToken = async (req, res, next) => {
-//     const authHeader = req.headers.authorization;
-
-//     if (!authHeader) {
-//         return res.status(401).send({ msg: "Unauth" })
-//     }
-
-//     const token = authHeader.split(" ")[1]
-
-//     if (!token) {
-//         return res.status(401).send({ msg: "Unauthorized!" });
-//     }
-
-
-//     const JWKS = createRemoteJWKSet(
-//         new URL('http://localhost:3000/api/auth/jwks')
-//     )
-
-//     try {
-//         const { payload } = await jwtVerify(token, JWKS)
-//         next()
-//     } catch (error) {
-//         return res.status(500).send({ msg: "Server Error!" });
-
-//     }
-// }
 
 
 
@@ -290,4 +264,4 @@ app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
 })
 
-
+export default app;
